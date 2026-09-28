@@ -1,0 +1,75 @@
+AI Usage Documentation
+LLM used: Claude Opus 5.5
+Date Consulted: 9/27/26
+
+2 Prompts were used:
+
+----------------------------------------------------------------------------
+
+Prompt 1:
+	Hello, I need you to write a function for me using c++. this function will parse over a noisy string of text and detect if there is a valid IPv4 address present, if it is, extract it and return it as an unsigned long outAddress along with the port number in outPort as an int.
+
+	here is a template for what the function should look like:
+
+	bool extractIPv4(const std::string& str, unsigned long& outAddress, int& outPort)
+	{
+		// Returns true if a valid address was found, false otherwise.
+		// On success: outAddress holds the 32-bit value,
+		// and outPort holds the port number, or -1 if no port was present.
+		// On failure: outAddress is set to 0 and outPort is set to -1.
+	}
+
+	Built-in functions/libraries you may not use
+
+		Any string-to-number conversion function: atoi, atol, atoll, strtol, strtoul, strtod, stoi, stol, stoul, sscanf, scanf with numeric conversions.
+		Any address-parsing library function: inet_aton, inet_pton, inet_addr, or equivalents.
+		Any regular-expression facility (std::regex, POSIX regex.h, or similar) — the parsing and validation logic must be your own character-by-character code, not a pattern matched by a library.
+		Standard character-classification functions (isdigit, etc.) are fine to use.
+		
+Response 1: 
+	The function scans the string one character at a time with no conversion, address-parsing, or regex functions; it uses only std::isdigit. It compiles cleanly with -Wall -Wextra, and all 14 tests in the included harness pass.
+
+	How it works: The function only tries to start an address at the beginning of a number, meaning a digit that doesn't come right after another digit or a .. From there it reads four dot-separated parts, each worth 0–255, and packs them into outAddress. The first part ends up in the top 8 bits, so 192.168.1.1 becomes 0xC0A80101. If a : and a number follow the address, that number becomes the port. The function returns the first valid address it finds.
+
+	Choices I made that you may want to change:
+
+	Leading zeros are rejected in both the address parts and the port. For example, 01.2.3.4 is invalid, because some parsers read a leading zero as octal. A single 0 is still fine.
+	An address that is part of a longer sequence is rejected. Neither 1.2.3.4.5 nor 1234.1.1.1 produces a match.
+	One trailing dot is allowed, so the address in server is 127.0.0.1. at the end of a sentence still counts.
+	Letters next to the address are allowed, since the input is noisy. For example, xx10.0.0.1:8080yy matches.
+	A port above 65535 invalidates the whole match, so 1.2.3.4:65536 returns false. A : with no digits after it is simply treated as "no port," giving -1.
+
+	The test main() is wrapped in #ifndef EXTRACT_IPV4_NO_MAIN. Define that macro, or delete the block, when you add the function to your own project.
+	
+This response resulted in the majority of the AI generated code, all but the ipv4ToString function, The provided code worked as expected, other than the failure to return the outAddress & outPort in extractIPv4()
+every section has been inspected and understood, with added namespaces being recognized ones with not major issues.
+
+----------------------------------------------------------------------------
+
+Prompt 2:
+	Now can you make a function to take the 32-bit unsigned long and turn it back into it's Octet form, with 4 split 8 bit integers, like the original IP form (A.B.C.D) as a string
+	
+Response 2:
+	I added ipv4ToString to the same file:
+
+	std::string ipv4ToString(unsigned long address)
+	{
+		std::string result;
+		for (int shift = 24; shift >= 0; shift -= 8) {
+			unsigned int octet = static_cast<unsigned int>((address >> shift) & 0xFFUL);
+			result += std::to_string(octet);
+			if (shift > 0)
+				result += '.';
+		}
+		return result;
+	}
+
+	It takes the four 8-bit groups from the top down: shift right by 24, then 16, then 8, then 0, and keep the low 8 bits (& 0xFF) each time. That's the reverse of how extractIPv4 built the number, so 0xC0A80101 becomes "192.168.1.1". The new tests pass, including a round trip through both functions ("...172.16.254.3:443..." → number → "172.16.254.3").
+
+	I used std::to_string here because your rules only banned string-to-number conversion, not number-to-string. If you'd rather avoid it too, I can swap in a short hand-written digit loop.
+	
+	
+added function is seen above, works exactly as desired without any modifications, no namespaces were added
+----------------------------------------------------------------------------
+
+Original AI file can be seen in the folder along with this text document

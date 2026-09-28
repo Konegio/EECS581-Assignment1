@@ -1,0 +1,10 @@
+FLAGS := -Wall -Wextra
+
+all:
+	g++ $(FLAGS) IPExtractor.cpp -o IPExtractor
+
+clean:
+	rm -f *.o IPExtractor
+
+test:
+	./IPExtractor
